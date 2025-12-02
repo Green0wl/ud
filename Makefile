@@ -1,8 +1,8 @@
 so.o: so.s
 	xtensa-esp32-elf-as --text-section-literals -o so.o so.s
 
-so.elf: so.o esp32.ld
-	xtensa-esp32-elf-ld -T esp32.ld -o so.elf so.o
+so.elf: so.o so.ld
+	xtensa-esp32-elf-ld -T so.ld -o so.elf so.o
 
 so.bin: so.elf
 	esptool.py --chip esp32 elf2image \
