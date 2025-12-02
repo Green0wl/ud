@@ -1,4 +1,4 @@
-so.o:
+so.o: so.s
 	xtensa-esp32-elf-as --text-section-literals -o so.o so.s
 
 so.elf: so.o esp32.ld
