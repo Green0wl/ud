@@ -9,7 +9,7 @@ It is assumed that the connected ESP32 is recognized by the system as `/dev/ttyU
 
 Should further elucidation be required, direct reference to the code is advised, as it is comprehensively documented.
 
-## Deps: command line installation (Ubuntu):
+## Command line installation of dependencies (Ubuntu):
 ```shell
 ~$ sudo apt-get install git wget flex bison gperf python3 python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0 build-essential
 ~$ mkdir -p ~/esp
