@@ -44,6 +44,7 @@ It is to be assumed that the dependency installation section was completed in st
 ```
 
 ## Erasing:
+These commands will clear the ESP32 flash memory of instructions that cause the LED to flash:
 ```shell
 ~$ cd ~/esp/esp-idf/
 ~/esp/esp-idf$ . ./export.sh
