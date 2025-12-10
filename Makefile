@@ -66,6 +66,11 @@ flash: all
 	esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 115200 \
 			write_flash 0x1000 so.bin
 
+clean_flash:
+	make clean
+	esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash
+	make flash
+
 clean:
 	if test -e "so.bin"; then rm so.bin; fi
 	if test -e "so.elf"; then rm so.elf; fi

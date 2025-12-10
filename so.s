@@ -7,7 +7,7 @@
  * Most of the explanations were taken from there.
  */
 
-.section        .text
+.section                .text
 
 // Addresses below 0x4000_0000 are serviced using the data bus.  Addresses in
 // the range 0x4000_0000 ~ 0x4FFF_FFFF are serviced using the instruction bus.
@@ -33,29 +33,41 @@
 // GPIO_ENABLE_W1TS_REG: GPIO0-31 output enable set register. For every bit
 // that is 1 in the value written here, the corresponding bit in GPIO_ENABLE
 // will be set. (WO)
-gpio_enable:    .word 0x3FF44024
+gpio_enable:            .word 0x3FF44024
 
 // Register 6.2. GPIO_OUT_W1TS_REG (0x0008)
 // GPIO_OUT_W1TS_REG GPIO0-31 output set register. For every bit that is 1 in
 // the value written here, the corresponding bit in GPIO_OUT_REG will be set.
 // (WO)
-gpio_out_set:   .word 0x3FF44008
+gpio_out_set:           .word 0x3FF44008
 
 // Register 6.3. GPIO_OUT_W1TC_REG (0x000c)
 // GPIO_OUT_W1TC_REG GPIO0-31 output clear register. For every bit that is 1 in
 // the value written here, the corresponding bit in GPIO_OUT_REG will be
 // cleared. (WO)
-gpio_out_clr:   .word 0x3FF4400C
+gpio_out_clr:           .word 0x3FF4400C
 
 // This masks GPIO2 bit in registers above (**second** index from end).
 // See (a diagram explains it better than words):
 // https://documentation.espressif.com/esp32_technical_reference_manual_en.pdf#Regfloat.6.3
-gpio2_mask:     .word 0b00000100
+gpio2_mask:             .word 0b00000100
+
+// Register 9.30.  RTC_CNTL_WDTCONFIG0_REG (0x008C)
+// Configuration register for RWDT.
+rtc_wdt_conf:           .word 0x3FF4808C
+
+// Register 10.10. TIMG0_WDTCONFIG0_REG (0x0048)
+// Configuration register for MWDT.
+timg0_wdt_conf:         .word 0x3FF5F048
+
+// Register 10.10. TIMG1_WDTCONFIG0_REG (0x0048)
+// Configuration register for MWDT.
+timg1_wdt_conf:         .word 0x3FF60048
 
 // Just a counter to slow down CPU and make a delay between LED activity.
-delay_count:    .word 2000000
+delay_count:            .word 8000000
 
-.global         call_start_cpu0
+.global                 call_start_cpu0
 
 // There are 16 tegisters named a0 through a15.
 //   a0 is special - it holds the call return address.
@@ -71,58 +83,92 @@ delay_count:    .word 2000000
 //    the destination and the operands are on the right.
 
 call_start_cpu0:
-    /* Enable GPIO2 as output. The l32r instruction fetches a 32 bit constant
-     * that is stored (dumped) someplace nearby (hence the actual address where
-     * the constant is dumped is of little real interest). */
-    // This two instructions load data FROM constants TO registers in CPU.
+        // Disable RTC Watchdog Timer (RWDT).
+        // See:
+        // https://documentation.espressif.com/esp32_technical_reference_manual_en.pdf#chapter.11
+        l32r            a2, rtc_wdt_conf
+        movi            a3, 0
+        memw
+        s32i            a3, a2, 0
+        memw
 
-    // The Xtensa uses an instruction known as L32R to load constant values
-    // from memory that don't fit into the Xtensa's MOVI immediate load
-    // instruction, which has a 12-bit signed immediate field.
-    // See: https://stackoverflow.com/a/26610227/17798036
-    l32r        a2, gpio_enable
-    l32r        a3, gpio2_mask
-    /* memw is "memory wait". It is basically a CPU pipeline sync. It waits
-     * until all data loads and stores finish. */
-    memw
-    // s32i(Ax, Ay, imm): [Ay + imm] = Ax ; Store a 32 bit word.
-    // imm is an offset used for pointer arithmetic: Ay[imm] = Ax.
-    // This instruction writes data FROM register (a3) TO data bus (a2[0]).
-    //
-    // This is needed to enable GPIO2, writing in GPIO_ENABLE_W1TS_REG the
-    // corresponding value (third less significant bit of the mask loaded in a3
-    // CPU register represents GPIO2).
-    s32i        a3, a2, 0
-    memw
+        // Disable 0. Main System Watchdog Timer (MWDT).
+        // See:
+        // https://documentation.espressif.com/esp32_technical_reference_manual_en.pdf#chapter.11
+        l32r            a2, timg0_wdt_conf
+        movi            a3, 0
+        memw
+        s32i            a3, a2, 0
+        memw
 
+        // Disable 1. Main System Watchdog Timer (MWDT).
+        // See:
+        // https://documentation.espressif.com/esp32_technical_reference_manual_en.pdf#chapter.11
+        l32r            a2, timg1_wdt_conf
+        movi            a3, 0
+        memw
+        s32i            a3, a2, 0
+        memw
+
+        // Enable GPIO2 as output. The l32r instruction fetches a 32 bit
+        // constant that is stored (dumped) someplace nearby (hence the actual
+        // address where the constant is dumped is of little real interest).
+        // This two instructions load data FROM constants TO registers in CPU.
+
+        // The Xtensa uses an instruction known as L32R to load constant values
+        // from memory that don't fit into the Xtensa's MOVI immediate load
+        // instruction, which has a 12-bit signed immediate field.
+        // See: https://stackoverflow.com/a/26610227/17798036
+        l32r            a2, gpio_enable
+        l32r            a3, gpio2_mask
+        // memw is "memory wait". It is basically a CPU pipeline sync. It waits
+        // until all data loads and stores finish.
+        memw
+        // s32i(Ax, Ay, imm): [Ay + imm] = Ax ; Store a 32 bit word.
+        // imm is an offset used for pointer arithmetic: Ay[imm] = Ax.
+        // This instruction writes data FROM register (a3) TO data bus (a2[0]).
+        //
+        // This is needed to enable GPIO2, writing in GPIO_ENABLE_W1TS_REG the
+        // corresponding value (third less significant bit of the mask loaded in a3
+        // CPU register represents GPIO2).
+        s32i            a3, a2, 0
+        memw
 blink_loop:
-    /* Set GPIO2 HIGH */
-    l32r        a2, gpio_out_set
-    l32r        a3, gpio2_mask
-    memw
-    s32i        a3, a2, 0
-    memw
+        /* Set GPIO2 HIGH */
+        l32r            a2, gpio_out_set
+        l32r            a3, gpio2_mask
+        memw
+        s32i            a3, a2, 0
+        memw
+        excw
 
-    /* Delay */
-    l32r        a4, delay_count
+        /* Delay */
+        l32r            a4, delay_count
+        memw
 delay1:
-    // a4 = a4 - 1
-    addi        a4, a4, -1
-    // branch (i.e. jump to delay1) if not equal zero
-    bnez        a4, delay1
+        // a4 = a4 - 1
+        addi            a4, a4, -1
+        memw
+        // branch (i.e. jump to delay1) if not equal zero
+        bnez            a4, delay1
 
-    /* Set GPIO2 LOW */
-    l32r        a2, gpio_out_clr
-    l32r        a3, gpio2_mask
-    memw
-    s32i        a3, a2, 0
-    memw
+        /* Set GPIO2 LOW */
+        l32r            a2, gpio_out_clr
+        l32r            a3, gpio2_mask
+        memw
+        s32i            a3, a2, 0
+        memw
 
-    /* Delay */
-    l32r        a4, delay_count
+        /* Delay */
+        l32r            a4, delay_count
+        memw
 delay2:
-    addi        a4, a4, -1
-    bnez        a4, delay2
+        addi            a4, a4, -1
+        memw
+        bnez            a4, delay2
 
-    // jump unconditionally; aka. blink_loop()
-    j           blink_loop
+        memw
+        excw
+
+        // Jump unconditionally; aka. blink_loop()
+        j               blink_loop
